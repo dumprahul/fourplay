@@ -8,12 +8,17 @@
     "start": "next start"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^2.21.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cobe": "^0.6.4",
+    "framer-motion": "^12.23.12",
     "lucide-react": "^0.541.0",
+    "motion": "^12.23.12",
     "next": "15.5.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "rough-notation": "^0.5.1",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
