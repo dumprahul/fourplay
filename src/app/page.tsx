@@ -31,33 +31,47 @@ export default function Home() {
           fourplay.
         </TypingAnimation>
         
-        {/* Description */}
-        <p className="text-xl md:text-2xl text-white/90 mb-12 max-w-2xl mx-auto leading-relaxed">
-          send{" "}
-          <Highlighter action="highlight" color="#87CEFA">
-            tokens
-          </Highlighter>{" "}
-          across{" "}
-          <Highlighter action="underline" color="#FF9800">
-            chains
-          </Highlighter>{" "}
-          with{" "}
-          <Highlighter action="highlight" color="#FF6B6B">
-            4 memes
-          </Highlighter>
-        </p>
+        
+        
         
         {/* Get Started Button */}
-        <div className="flex justify-center">
-          <ShimmerButton
-            className="text-lg px-8 py-4"
-            shimmerColor="#ffffff"
-            background="rgba(0, 0, 0, 0.8)"
-            shimmerDuration="2s"
-            borderRadius="50px"
-          >
-            Get Started
-          </ShimmerButton>
+      
+        
+        {/* Glassy Navbar */}
+        <div className="mt-16 flex justify-center">
+          <nav className="backdrop-blur-md bg-white/10 border border-white/20 rounded-full px-8 py-4 shadow-2xl">
+            <div className="flex gap-6 items-center">
+              <ShimmerButton
+                className="text-base px-6 py-3"
+                shimmerColor="#87CEFA"
+                background="rgba(135, 206, 250, 0.2)"
+                shimmerDuration="1.5s"
+                borderRadius="30px"
+              >
+                create receipt
+              </ShimmerButton>
+              
+              <ShimmerButton
+                className="text-base px-6 py-3"
+                shimmerColor="#FF9800"
+                background="rgba(255, 152, 0, 0.2)"
+                shimmerDuration="1.5s"
+                borderRadius="30px"
+              >
+                drop receipt
+              </ShimmerButton>
+              
+              <ShimmerButton
+                className="text-base px-6 py-3"
+                shimmerColor="#FF6B6B"
+                background="rgba(255, 107, 107, 0.2)"
+                shimmerDuration="1.5s"
+                borderRadius="30px"
+              >
+                connect wallet
+              </ShimmerButton>
+            </div>
+          </nav>
         </div>
       </div>
     </div>
