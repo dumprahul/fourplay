@@ -38,7 +38,7 @@ export default function Home() {
       
         
         {/* Glassy Navbar */}
-        <div className="mt-16 flex justify-center">
+        <div className="mt-8 flex justify-center">
           <nav className="backdrop-blur-md bg-white/10 border border-white/20 rounded-full px-8 py-4 shadow-2xl">
             <div className="flex gap-6 items-center">
               <ShimmerButton
