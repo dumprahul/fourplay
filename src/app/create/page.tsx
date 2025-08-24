@@ -4,7 +4,14 @@ import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ShineBorder } from "@/components/magicui/shine-border";
 import { useLogin, usePrivy, useLogout, useWallets } from '@privy-io/react-auth';
 import { useEffect, useState, useRef } from 'react';
-import { Search, ChevronDown, X } from 'lucide-react';
+import { Search, ChevronDown, X, CheckCircle, Copy } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface Token {
   tokenAddress: string;
@@ -16,6 +23,19 @@ interface Token {
   branding?: {
     logoUri?: string;
   };
+}
+
+interface Receipt {
+  id: string;
+  funny_key: string;
+  description: string;
+  token_name: string;
+  token_address: string;
+  chain_name: string;
+  chain_id: number;
+  amount: number;
+  token_decimals: number;
+  created_at: string;
 }
 
 export default function CreatePage() {
@@ -31,12 +51,103 @@ export default function CreatePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // State for custom dropdown
+  // State for custom modal
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Form state
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [receiptCreated, setReceiptCreated] = useState<Receipt | null>(null);
+  const [funnyKeyCopied, setFunnyKeyCopied] = useState(false);
+
+  // Generate 4 funny words
+  const generateFunnyKey = () => {
+    const funnyWords = [
+      'banana', 'pizza', 'unicorn', 'ninja', 'taco', 'dragon', 'bubble', 'rainbow',
+      'marshmallow', 'spaghetti', 'wizard', 'penguin', 'cupcake', 'robot', 'butterfly', 'dinosaur',
+      'chocolate', 'firework', 'jellybean', 'octopus', 'popcorn', 'squirrel', 'watermelon', 'zombie',
+      'avocado', 'bumblebee', 'cactus', 'donut', 'elephant', 'flamingo', 'giraffe', 'hamburger'
+    ];
+    
+    const shuffled = funnyWords.sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 4).join('-');
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedToken || !description.trim() || !amount.trim()) {
+      setError('Please fill in all fields and select a token');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const funnyKey = generateFunnyKey();
+      console.log('🎯 Creating receipt with funny key:', funnyKey);
+
+      const receiptData = {
+        funny_key: funnyKey,
+        description: description.trim(),
+        token_name: selectedToken.name,
+        token_address: selectedToken.tokenAddress,
+        chain_name: 'hyperevm',
+        chain_id: 1337, // hyperevm chain ID
+        amount: parseFloat(amount),
+        token_decimals: selectedToken.decimals
+      };
+
+      console.log('📤 Receipt data to store:', receiptData);
+
+      const { data, error: supabaseError } = await supabase
+        .from('receipts')
+        .insert([receiptData])
+        .select()
+        .single();
+
+      if (supabaseError) {
+        console.error('❌ Supabase error:', supabaseError);
+        throw new Error(`Database error: ${supabaseError.message}`);
+      }
+
+      console.log('✅ Receipt created successfully:', data);
+      setReceiptCreated(data);
+      
+      // Reset form
+      setDescription('');
+      setAmount('');
+      setSelectedToken(null);
+      setSearchQuery('');
+
+    } catch (err) {
+      console.error('❌ Error creating receipt:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create receipt');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Copy funny key to clipboard
+  const copyFunnyKey = async () => {
+    if (receiptCreated) {
+      try {
+        await navigator.clipboard.writeText(receiptCreated.funny_key);
+        setFunnyKeyCopied(true);
+        setTimeout(() => setFunnyKeyCopied(false), 2000);
+        console.log('📋 Funny key copied to clipboard:', receiptCreated.funny_key);
+      } catch (err) {
+        console.error('❌ Failed to copy to clipboard:', err);
+      }
+    }
+  };
 
   // Filter tokens based on search query
   useEffect(() => {
@@ -52,7 +163,7 @@ export default function CreatePage() {
     }
   }, [searchQuery, tokens]);
 
-  // Close dropdown when clicking outside
+  // Close modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -222,102 +333,147 @@ export default function CreatePage() {
               <div className="relative z-10">
                 {/* <h2 className="text-xl  text-white mb-4 text-center"> ReceiptCreate</h2> */}
                 
-                <form className="space-y-4">
-                  {/* Description Field */}
-                  <div>
-                    <label className="block text-white text-sm font-medium mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                      rows={2}
-                      placeholder="Enter receipt description..."
-                    />
+                {receiptCreated ? (
+                  /* Success State */
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-white mb-2">Receipt Created!</h3>
+                      <p className="text-white/70 mb-4">Share this funny key with others to let them claim your receipt</p>
+                    </div>
+                    
+                    <div className="bg-white/10 border border-white/20 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-white/60 mb-2">Your Funny Key:</p>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-2xl font-bold text-white font-mono">
+                          {receiptCreated.funny_key}
+                        </span>
+                        <button
+                          onClick={copyFunnyKey}
+                          className="text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          <Copy className="w-5 h-5" />
+                        </button>
+                      </div>
+                      {funnyKeyCopied && (
+                        <p className="text-green-400 text-sm mt-2">Copied to clipboard!</p>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => setReceiptCreated(null)}
+                      className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white transition-colors"
+                    >
+                      Create Another Receipt
+                    </button>
                   </div>
-                  
-                  {/* Amount and Token in same row */}
-                  <div className="flex gap-4">
-                    {/* Amount Field */}
-                    <div className="flex-1">
+                ) : (
+                  /* Form State */
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Description Field */}
+                    <div>
                       <label className="block text-white text-sm font-medium mb-1">
-                        Amount
+                        Description
                       </label>
-                      <input
-                        type="number"
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        rows={2}
+                        placeholder="Enter receipt description..."
+                        required
                       />
                     </div>
                     
-                    {/* Custom Token Modal */}
-                    <div className="flex-1">
-                      <label className="block text-white text-sm font-medium mb-1">
-                        Token
-                      </label>
-                      <div className="relative">
-                        {/* Token Selection Button */}
-                        <div 
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white cursor-pointer hover:bg-white/15 transition-colors flex items-center justify-between"
-                          onClick={() => setIsDropdownOpen(true)}
-                        >
-                          {selectedToken ? (
-                            <div className="flex items-center gap-2">
-                              {selectedToken.branding?.logoUri ? (
-                                <img 
-                                  src={selectedToken.branding.logoUri} 
-                                  alt={selectedToken.symbol}
-                                  className="w-5 h-5 rounded-full"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                  }}
-                                />
-                              ) : (
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white">
-                                  {selectedToken.symbol.charAt(0)}
-                                </div>
-                              )}
-                              <span className="font-medium">{selectedToken.symbol}</span>
-                              <span className="text-white/60 text-sm">- {selectedToken.name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-white/50">
-                              {loading ? 'Loading tokens...' : 'Select token'}
-                            </span>
-                          )}
-                          <ChevronDown className="w-4 h-4 text-white/60" />
-                        </div>
+                    {/* Amount and Token in same row */}
+                    <div className="flex gap-4">
+                      {/* Amount Field */}
+                      <div className="flex-1">
+                        <label className="block text-white text-sm font-medium mb-1">
+                          Amount
+                        </label>
+                        <input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          required
+                        />
                       </div>
                       
-                      {/* Status Messages */}
-                      {error && (
-                        <p className="text-red-400 text-xs mt-1">{error}</p>
-                      )}
-                      {loading && (
-                        <p className="text-blue-400 text-xs mt-1">Loading tokens from hyperevm...</p>
-                      )}
-                      {!loading && !error && tokens.length > 0 && (
-                        <p className="text-green-400 text-xs mt-1">
-                          {tokens.length} tokens loaded from hyperevm
-                        </p>
-                      )}
+                      {/* Custom Token Modal */}
+                      <div className="flex-1">
+                        <label className="block text-white text-sm font-medium mb-1">
+                          Token
+                        </label>
+                        <div className="relative">
+                          {/* Token Selection Button */}
+                          <div 
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white cursor-pointer hover:bg-white/15 transition-colors flex items-center justify-between"
+                            onClick={() => setIsDropdownOpen(true)}
+                          >
+                            {selectedToken ? (
+                              <div className="flex items-center gap-2">
+                                {selectedToken.branding?.logoUri ? (
+                                  <img 
+                                    src={selectedToken.branding.logoUri} 
+                                    alt={selectedToken.symbol}
+                                    className="w-5 h-5 rounded-full"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white">
+                                    {selectedToken.symbol.charAt(0)}
+                                  </div>
+                                )}
+                                <span className="font-medium">{selectedToken.symbol}</span>
+                                <span className="text-white/60 text-sm">- {selectedToken.name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-white/50">
+                                {loading ? 'Loading tokens...' : 'Select token'}
+                              </span>
+                            )}
+                            <ChevronDown className="w-4 h-4 text-white/60" />
+                          </div>
+                        </div>
+                        
+                        {/* Status Messages */}
+                        {error && (
+                          <p className="text-red-400 text-xs mt-1">{error}</p>
+                        )}
+                        {loading && (
+                          <p className="text-blue-400 text-xs mt-1">Loading tokens from hyperevm...</p>
+                        )}
+                        {!loading && !error && tokens.length > 0 && (
+                          <p className="text-green-400 text-xs mt-1">
+                            {tokens.length} tokens loaded from hyperevm
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Submit Button */}
-                  <div className="pt-2">
-                    <ShimmerButton
-                      className="w-full text-base py-2"
-                      shimmerColor="#87CEFA"
-                      background="rgba(135, 206, 250, 0.3)"
-                      shimmerDuration="2s"
-                      borderRadius="12px"
-                    >
-                      Create Receipt
-                    </ShimmerButton>
-                  </div>
-                </form>
+                    
+                    {/* Submit Button */}
+                    <div className="pt-2">
+                      <ShimmerButton
+                        type="submit"
+                        disabled={isSubmitting || !selectedToken || !description.trim() || !amount.trim()}
+                        className="w-full text-base py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        shimmerColor="#87CEFA"
+                        background="rgba(135, 206, 250, 0.3)"
+                        shimmerDuration="2s"
+                        borderRadius="12px"
+                      >
+                        {isSubmitting ? 'Creating Receipt...' : 'Create Receipt'}
+                      </ShimmerButton>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
           </div>
