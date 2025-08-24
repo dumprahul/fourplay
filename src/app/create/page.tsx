@@ -3,7 +3,8 @@
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ShineBorder } from "@/components/magicui/shine-border";
 import { useLogin, usePrivy, useLogout, useWallets } from '@privy-io/react-auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Search, ChevronDown, X } from 'lucide-react';
 
 interface Token {
   tokenAddress: string;
@@ -29,6 +30,39 @@ export default function CreatePage() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // State for custom dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filter tokens based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredTokens(tokens);
+    } else {
+      const filtered = tokens.filter(token => 
+        token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        token.tokenAddress.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTokens(filtered);
+    }
+  }, [searchQuery, tokens]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch tokens from GlueX API
   const fetchTokens = async () => {
@@ -114,14 +148,17 @@ export default function CreatePage() {
         
         console.log('🔄 Sorted tokens by priority and symbol:', sortedTokens);
         setTokens(sortedTokens);
+        setFilteredTokens(sortedTokens);
       } else {
         console.warn('⚠️ No tokens found in response data');
         setTokens([]);
+        setFilteredTokens([]);
       }
     } catch (err) {
       console.error('❌ Error fetching tokens:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch tokens');
       setTokens([]);
+      setFilteredTokens([]);
     } finally {
       setLoading(false);
       console.log('🏁 Token fetching completed');
@@ -133,6 +170,21 @@ export default function CreatePage() {
     console.log('🚀 CreatePage component mounted, fetching tokens...');
     fetchTokens();
   }, []);
+
+  // Handle token selection
+  const handleTokenSelect = (token: Token) => {
+    setSelectedToken(token);
+    setIsDropdownOpen(false);
+    setSearchQuery('');
+    console.log('🎯 Token selected:', token);
+  };
+
+  // Clear selected token
+  const clearSelection = () => {
+    setSelectedToken(null);
+    setSearchQuery('');
+    console.log('🗑️ Token selection cleared');
+  };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -199,31 +251,46 @@ export default function CreatePage() {
                       />
                     </div>
                     
-                    {/* Token Field */}
+                    {/* Custom Token Modal */}
                     <div className="flex-1">
                       <label className="block text-white text-sm font-medium mb-1">
                         Token
                       </label>
-                      <select 
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        onChange={(e) => {
-                          const selectedToken = tokens.find(t => t.tokenAddress === e.target.value);
-                          console.log('🎯 Token selected:', selectedToken);
-                        }}
-                      >
-                        <option value="" className="bg-gray-800 text-white">
-                          {loading ? 'Loading tokens...' : 'Select token'}
-                        </option>
-                        {tokens.map((token) => (
-                          <option 
-                            key={token.tokenAddress} 
-                            value={token.tokenAddress}
-                            className="bg-gray-800 text-white"
-                          >
-                            {token.symbol} - {token.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        {/* Token Selection Button */}
+                        <div 
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white cursor-pointer hover:bg-white/15 transition-colors flex items-center justify-between"
+                          onClick={() => setIsDropdownOpen(true)}
+                        >
+                          {selectedToken ? (
+                            <div className="flex items-center gap-2">
+                              {selectedToken.branding?.logoUri ? (
+                                <img 
+                                  src={selectedToken.branding.logoUri} 
+                                  alt={selectedToken.symbol}
+                                  className="w-5 h-5 rounded-full"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white">
+                                  {selectedToken.symbol.charAt(0)}
+                                </div>
+                              )}
+                              <span className="font-medium">{selectedToken.symbol}</span>
+                              <span className="text-white/60 text-sm">- {selectedToken.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-white/50">
+                              {loading ? 'Loading tokens...' : 'Select token'}
+                            </span>
+                          )}
+                          <ChevronDown className="w-4 h-4 text-white/60" />
+                        </div>
+                      </div>
+                      
+                      {/* Status Messages */}
                       {error && (
                         <p className="text-red-400 text-xs mt-1">{error}</p>
                       )}
@@ -256,6 +323,110 @@ export default function CreatePage() {
           </div>
         </div>
       </div>
+      
+      {/* Token Selection Modal */}
+      {isDropdownOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-white/20 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Select Token</h3>
+              <button
+                onClick={() => setIsDropdownOpen(false)}
+                className="text-white/60 hover:text-white/80 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-4 border-b border-white/20">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
+                <input
+                  type="text"
+                  placeholder="Search tokens..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white/80"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Token List */}
+            <div className="overflow-y-auto max-h-[50vh]">
+              {filteredTokens.length > 0 ? (
+                filteredTokens.map((token) => (
+                  <div
+                    key={token.tokenAddress}
+                    className="px-4 py-3 hover:bg-white/10 cursor-pointer transition-colors flex items-center gap-3 border-b border-white/5 last:border-b-0"
+                    onClick={() => handleTokenSelect(token)}
+                  >
+                    {/* Token Logo */}
+                    {token.branding?.logoUri ? (
+                      <img 
+                        src={token.branding.logoUri} 
+                        alt={token.symbol}
+                        className="w-8 h-8 rounded-full flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+                        {token.symbol.charAt(0)}
+                      </div>
+                    )}
+                    
+                    {/* Token Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-white">{token.symbol}</span>
+                        <span className="text-xs px-2 py-1 bg-white/10 rounded-full text-white/70">
+                          {token.type}
+                        </span>
+                      </div>
+                      <div className="text-sm text-white/60 truncate">
+                        {token.name}
+                      </div>
+                    </div>
+                    
+                    {/* Priority Badge */}
+                    <div className="text-xs text-white/40 flex-shrink-0">
+                      #{token.priority}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center text-white/60 text-sm">
+                  {searchQuery ? 'No tokens found matching your search' : 'No tokens available'}
+                </div>
+              )}
+            </div>
+
+            {/* Clear Selection Button */}
+            {selectedToken && (
+              <div className="p-4 border-t border-white/20">
+                <button
+                  onClick={clearSelection}
+                  className="w-full px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-300 hover:text-red-200 transition-colors text-sm"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Glassy Navbar - Centered Below */}
       <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
